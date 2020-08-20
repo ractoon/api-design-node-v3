@@ -56,25 +56,29 @@ export const signin = async (req, res) => {
 }
 
 export const protect = async (req, res, next) => {
-  if (!req.headers.authorization) {
+  const bearer = req.headers.authorization
+
+  if (!bearer || !bearer.startsWith('Bearer ')) {
     return res.status(401).end()
   }
 
-  let token = req.headers.authorization.split('Bearer ')[1]
-  if (!token) {
-    return res.status(401).end()
-  }
-
+  const token = bearer.split('Bearer ')[1].trim()
+  let payload
   try {
-    const payload = verifyToken(token)
-    const user = await User.findById(payload.id)
-      .select('-password')
-      .lean()
-      .exec()
-    req.user = user
-    next()
+    payload = await verifyToken(token)
   } catch (e) {
-    console.error(e)
     return res.status(401).end()
   }
+
+  const user = await User.findById(payload.id)
+    .select('-password')
+    .lean()
+    .exec()
+
+  if (!user) {
+    return res.status(401).end()
+  }
+
+  req.user = user
+  next()
 }
